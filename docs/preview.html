@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LINE公式アカウント 予約受付・自動応答Bot デモプレビュー</title>
+<style>
+  :root{
+    --bg:#ffffff; --panel:#f5f5f5; --ink:#0f0e12;
+    --gray-1:#4d4d4d; --gray-2:#7f7f7f; --gray-3:#b2b2b2;
+    --accent:#ff4e00; --link:#0071bb;
+    --lcd-bg:#272727; --lcd-text:#f5f5f5;
+    --ui:"Helvetica Neue",Helvetica,Arial,"Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif;
+    --mono:ui-monospace,"Cascadia Mono","Roboto Mono",Consolas,monospace;
+  }
+  *{box-sizing:border-box;border-radius:0!important}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--ui);line-height:1.6}
+  .wrap{max-width:960px;margin:0 auto;padding:28px 20px 48px;display:flex;gap:24px;flex-wrap:wrap;align-items:flex-start}
+
+  /* ---- EP-133 風コントロールパネル ---- */
+  .legend{flex:1 1 300px;min-width:280px;background:var(--panel);border:1px solid var(--gray-3);padding:20px}
+  .legend h1{font-weight:300;font-size:30px;margin:0 0 2px;letter-spacing:.02em}
+  .kicker{font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:lowercase;color:var(--gray-2);margin:0 0 18px}
+  .lcd{background:var(--lcd-bg);color:var(--lcd-text);font-family:var(--mono);font-size:13px;padding:12px 14px;margin:0 0 18px;display:flex;justify-content:space-between}
+  .lcd b{color:#fff;font-weight:400}
+  .label{font-family:var(--mono);font-size:10px;letter-spacing:.16em;text-transform:lowercase;color:var(--gray-2);margin:16px 0 8px}
+  .chips{display:flex;flex-wrap:wrap;gap:6px}
+  .chip,.act{font-family:var(--ui);font-size:13px;background:var(--panel);border:1px solid var(--gray-3);border-bottom:2px solid var(--gray-1);color:var(--ink);padding:7px 11px;cursor:pointer}
+  .chip:hover,.act:hover{background:var(--ink);color:#fff;border-color:var(--ink)}
+  .act{display:block;width:100%;text-align:left;margin-top:8px}
+  .act.primary{border-bottom-color:var(--accent)}
+  .note{font-size:12px;color:var(--gray-1);margin-top:18px;border-top:1px solid var(--gray-3);padding-top:12px}
+
+  /* ---- LINE トーク再現（視認性優先・枠は直角）---- */
+  .phone{flex:1 1 320px;min-width:300px;border:1px solid var(--ink);background:#8aa9c6}
+  .bar{background:var(--ink);color:#fff;padding:11px 14px;display:flex;align-items:center;gap:9px}
+  .bar .dot{width:8px;height:8px;background:var(--accent);display:inline-block}
+  .bar .nm{font-size:15px}
+  .bar .sub{font-family:var(--mono);font-size:10px;color:var(--gray-3);margin-left:auto;letter-spacing:.1em}
+  .talk{height:420px;overflow-y:auto;padding:14px;background:#8aa9c6}
+  .row{display:flex;margin-bottom:12px}
+  .row.me{justify-content:flex-end}
+  .who{font-size:10px;color:#2a3b4d;margin:0 8px 3px}
+  .bub{max-width:78%;padding:9px 12px;font-size:13.5px;border:1px solid rgba(0,0,0,.15)}
+  .bot .bub{background:#fff;color:#1a1a1a}
+  .me .bub{background:#8de055;color:#12300a}
+  .card{background:#fff;border:1px solid var(--gray-3);max-width:82%;padding:0}
+  .card .hd{background:var(--ink);color:#fff;font-size:12px;padding:6px 10px;letter-spacing:.04em}
+  .card .bd{padding:10px 12px;font-size:13px;color:#1a1a1a}
+  .card .btn{display:block;width:100%;text-align:center;border:0;border-top:1px solid var(--gray-3);background:#fff;color:var(--link);font-size:13.5px;padding:9px;cursor:pointer;font-family:var(--ui)}
+  .card .btn:hover{background:var(--panel)}
+  .card .btn.hot{color:#fff;background:var(--accent)}
+  .card .btn.hot:hover{filter:brightness(.92)}
+
+  /* ---- リッチメニュー（EP-133 パッド風キーキャップ）---- */
+  .rich{display:grid;grid-template-columns:repeat(3,1fr);background:var(--ink)}
+  .key{background:var(--panel);color:var(--ink);border:1px solid var(--ink);border-bottom:3px solid var(--gray-1);padding:12px 6px;text-align:center;cursor:pointer}
+  .key:hover{background:#fff}
+  .key .jp{font-size:13px}
+  .key .en{display:block;font-family:var(--mono);font-size:9px;letter-spacing:.12em;color:var(--gray-2);text-transform:lowercase;margin-top:3px}
+  .key.book{border-bottom-color:var(--accent)}
+  .composer{display:flex;border-top:1px solid var(--ink);background:#fff}
+  .composer input{flex:1;border:0;padding:11px 12px;font-size:14px;font-family:var(--ui)}
+  .composer input:focus{outline:2px solid var(--ink);outline-offset:-2px}
+  .composer button{border:0;background:var(--ink);color:#fff;padding:0 18px;font-size:14px;cursor:pointer}
+  .foot{max-width:960px;margin:0 auto;padding:0 20px 40px}
+  .foot p{font-size:12px;color:var(--gray-1);border-top:1px solid var(--gray-3);padding-top:14px}
+  @media(max-width:640px){.talk{height:360px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- コントロール -->
+  <section class="legend">
+    <h1>line bot</h1>
+    <p class="kicker">reservation / auto-reply · demo preview</p>
+
+    <div class="lcd"><span>reservations</span><b id="lcdCount">00</b></div>
+    <div class="lcd"><span>mode</span><b>demo (no live line)</b></div>
+
+    <div class="label">try keywords</div>
+    <div class="chips">
+      <button class="chip" data-say="営業時間は？">営業時間</button>
+      <button class="chip" data-say="アクセスを教えて">アクセス</button>
+      <button class="chip" data-say="カラーの料金は？">メニュー・料金</button>
+      <button class="chip" data-say="クーポンある？">クーポン</button>
+      <button class="chip" data-say="駐車場はありますか？">駐車場(AI)</button>
+      <button class="chip" data-say="近くにおすすめのランチある？">範囲外(AI)</button>
+    </div>
+
+    <div class="label">actions</div>
+    <button class="act primary" id="playReserve">予約フローを再生</button>
+    <button class="act" id="playDouble">同じ枠をもう一度予約（満席デモ）</button>
+    <button class="act" id="reset">トークをリセット</button>
+
+    <p class="note">実演サンプル（デモ）です。店舗「サンプルサロン」・メニュー・料金は架空。</p>
+  </section>
+
+  <!-- LINEトーク再現 -->
+  <section class="phone">
+    <div class="bar"><span class="dot"></span><span class="nm">サンプルサロン</span><span class="sub">line official</span></div>
+    <div class="talk" id="talk"></div>
+    <div class="rich">
+      <div class="key book" data-act="reserve"><span class="jp">予約する</span><span class="en">reserve</span></div>
+      <div class="key" data-say="メニューを教えて"><span class="jp">メニュー</span><span class="en">menu</span></div>
+      <div class="key" data-say="クーポンある？"><span class="jp">クーポン</span><span class="en">coupon</span></div>
+      <div class="key" data-say="営業時間は？"><span class="jp">営業時間</span><span class="en">hours</span></div>
+      <div class="key" data-say="アクセスを教えて"><span class="jp">アクセス</span><span class="en">access</span></div>
+      <div class="key" data-say="電話したい"><span class="jp">電話</span><span class="en">tel</span></div>
+    </div>
+    <div class="composer">
+      <input id="inp" placeholder="メッセージを入力（例: カラーいくら？）" autocomplete="off">
+      <button id="send">送信</button>
+    </div>
+  </section>
+</div>
+<div class="foot"><p>※ 実際のLINEでは日付→開始時刻の順に、空きのある候補だけがボタンで並びます。本プレビューは動作イメージを掴むための簡易再現です（枠・背景・ラベルは共通デザインに準拠、トーク内は視認性優先）。</p></div>
+
+<script>
+// ---- 店舗情報 / FAQ（Code.gs のデモ設定に対応した簡易ポート）----
+var STORE={name:'サンプルサロン',hours:'10:00〜19:00',closed:'毎週火曜',access:'サンプル駅 東口から徒歩5分',menu:'カット ¥4,400 / カラー ¥7,700〜 / パーマ ¥8,800〜',tel:'000-0000-0000',coupon:'友だち追加限定：初回カット20%OFF'};
+var FAQ=[
+  {k:['営業時間','何時','開いて','定休'],a:function(){return STORE.name+'の営業時間は '+STORE.hours+'（'+STORE.closed+'定休）です。';}},
+  {k:['アクセス','場所','どこ','地図','住所','行き方'],a:function(){return 'アクセス：'+STORE.access+'。地図は下のメニュー「地図」からご確認いただけます。';}},
+  {k:['メニュー','料金','値段','いくら','価格','カット','カラー','パーマ'],a:function(){return '主なメニューと料金：'+STORE.menu+'（税込）。';}},
+  {k:['クーポン','割引','初回'],a:function(){return STORE.coupon+' をご用意しています。ご来店時にこの画面をお見せください。';}},
+  {k:['電話','でんわ','連絡'],a:function(){return 'お電話は '+STORE.tel+' へどうぞ。トークからのご予約は「予約」と送るか下のメニューからどうぞ。';}}
+];
+var AI=[
+  {k:['駐車','パーキング','車で','車は'],a:'専用駐車場はございませんが、店舗となりのコインパーキング（30分200円）をご利用いただけます。'},
+  {k:['子供','子ども','こども','キッズ','子連れ'],a:'お子さま連れのご来店も歓迎です。ベビーカーのまま入れる席をご案内します。'},
+  {k:['支払','カード','クレジット','PayPay','決済','現金'],a:'お支払いは現金・各種クレジットカード・PayPay がご利用いただけます。'}
+];
+var FALLBACK='お問い合わせありがとうございます。その内容はスタッフが確認いたします。お急ぎの場合はお電話（'+STORE.tel+'）、またはご予約は「予約」と送信してお進みください。';
+
+// ---- 台帳（この画面内の予約状況）----
+var booked={}; // 'date time' -> true
+function count(){return Object.keys(booked).length;}
+function updateLcd(){document.getElementById('lcdCount').textContent=('0'+count()).slice(-2);}
+
+// ---- 描画 ----
+var talk=document.getElementById('talk');
+function scroll(){talk.scrollTop=talk.scrollHeight;}
+function bubble(side,text,who){
+  var row=document.createElement('div');row.className='row '+(side==='me'?'me':'bot');
+  var wrap=document.createElement('div');
+  if(who){var w=document.createElement('div');w.className='who';w.textContent=who;wrap.appendChild(w);}
+  var b=document.createElement('div');b.className='bub';b.textContent=text;wrap.appendChild(b);
+  row.appendChild(wrap);talk.appendChild(row);scroll();
+}
+function card(title,body,buttons){
+  var row=document.createElement('div');row.className='row bot';
+  var c=document.createElement('div');c.className='card';
+  var h=document.createElement('div');h.className='hd';h.textContent=title;c.appendChild(h);
+  var bd=document.createElement('div');bd.className='bd';bd.textContent=body;c.appendChild(bd);
+  (buttons||[]).forEach(function(bt){
+    var el=document.createElement('button');el.className='btn'+(bt.hot?' hot':'');el.textContent=bt.label;
+    el.onclick=function(){ if(bt.once){el.parentNode.querySelectorAll('.btn').forEach(function(x){x.disabled=true;x.style.opacity=.5;});} bt.onClick(); };
+    c.appendChild(el);
+  });
+  row.appendChild(c);talk.appendChild(row);scroll();
+}
+
+// ---- Bot ロジック ----
+function match(list,t){for(var i=0;i<list.length;i++)for(var j=0;j<list[i].k.length;j++)if(t.indexOf(list[i].k[j])>=0)return list[i].a;return null;}
+function botText(t){
+  if(/予約|よやく/.test(t)){setTimeout(reserveStart,350);return;}
+  var f=match(FAQ,t); if(f){reply(f());return;}
+  var ai=match(AI,t); if(ai){reply(ai);return;}      // AI応答
+  reply(FALLBACK);                                    // 範囲外 → 有人・フォーム案内
+}
+function reply(text){setTimeout(function(){bubble('bot',text,STORE.name);},300);}
+
+// ---- 予約フロー ----
+var SLOTS=[{dt:'2026-07-20T14:00',label:'2026年7月20日(月) 14:00'},{dt:'2026-07-20T15:00',label:'2026年7月20日(月) 15:00'}];
+function reserveStart(){
+  card('ご予約','ご希望の来店日時をお選びください',SLOTS.map(function(s){
+    return {label:s.label,onClick:function(){ bubble('me',s.label+' を選択','you'); setTimeout(function(){pickSlot(s);},300); }};
+  }));
+}
+function pickSlot(s){
+  if(booked[s.dt]){ reply('申し訳ありません、'+s.label+' は満席です。別の日時はいかがでしょうか。'); setTimeout(reserveStart,700); return; }
+  card('内容の確認',s.label+' でご予約を承ります。よろしいですか？',[
+    {label:'確定する',hot:true,once:true,onClick:function(){ confirmSlot(s); }},
+    {label:'選び直す',once:true,onClick:function(){ setTimeout(reserveStart,250); }}
+  ]);
+}
+function confirmSlot(s){
+  if(booked[s.dt]){ reply('申し訳ありません、'+s.label+' は満席です。別の日時はいかがでしょうか。'); return; }
+  booked[s.dt]=true; updateLcd();
+  reply('ご予約を確定しました。\n■ '+STORE.name+'\n■ '+s.label+'\n変更・キャンセルはこのトークからご連絡ください。');
+}
+
+// ---- 入力配線 ----
+function say(t){bubble('me',t,'you');botText(t);}
+document.getElementById('send').onclick=function(){var v=document.getElementById('inp').value.trim();if(!v)return;document.getElementById('inp').value='';say(v);};
+document.getElementById('inp').addEventListener('keydown',function(e){if(e.key==='Enter')document.getElementById('send').click();});
+document.querySelectorAll('[data-say]').forEach(function(el){el.onclick=function(){say(el.getAttribute('data-say'));};});
+document.querySelectorAll('[data-act="reserve"]').forEach(function(el){el.onclick=function(){bubble('me','予約したい','you');setTimeout(reserveStart,300);};});
+
+document.getElementById('playReserve').onclick=function(){
+  reset(); say('予約したい');
+  setTimeout(function(){bubble('me',SLOTS[0].label+' を選択','you');pickSlot(SLOTS[0]);},1100);
+  setTimeout(function(){var b=talk.querySelector('.card .btn.hot');if(b)b.click();},2200);
+};
+document.getElementById('playDouble').onclick=function(){
+  booked['2026-07-20T14:00']=true;updateLcd();
+  bubble('me','予約したい（別のお客さま）','you');
+  setTimeout(function(){bubble('me',SLOTS[0].label+' を選択','you');pickSlot(SLOTS[0]);},700);
+};
+function reset(){talk.innerHTML='';booked={};updateLcd();bubble('bot','友だち追加ありがとうございます！'+STORE.name+'です。ご予約は「予約」と送るか、下のメニュー「予約する」から。営業時間・メニュー・クーポンもこのトークでご案内します。',STORE.name);}
+document.getElementById('reset').onclick=reset;
+reset();
+</script>
+</body>
+</html>

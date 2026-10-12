@@ -1,0 +1,12 @@
+{
+  "name": "line-booking-bot",
+  "version": "1.0.0",
+  "private": true,
+  "license": "MIT",
+  "scripts": {
+    "test": "node test/run-tests.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
